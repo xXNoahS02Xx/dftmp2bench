@@ -9,8 +9,37 @@ Compare MP2 vs DFT energies
 
 ## Instructions
 
+Using uv as a package manager, (pip install uv).
+
+```bash
+uv sync
+source .venv/bin/activate
+'''
+Type "deactivate" to deactivate the environment.
+
 Modify "directories.json" to point to the directories containing the output directories of the calculations you want to compare.
 Include "user" as a way to identify who ran which calculations.
+
+## Installing QM software
+
+### XTB
+
+XTB using xyz files as input: "xtb input.xyz"
+
+### Orca
+Orca is available on the clusters, try "module load orca", "which orca" to get the full path (orca needs to be run using the full path for jobs using multiple cores). "/full/path/to/orca input.com" will run the job.
+
+### Psi4
+Installation through conda:
+```bash 
+conda deactivate; conda create -n p4env psi4 -c conda-forge/label/libint_dev -c conda-forge
+'''
+
+"psi4 input.com"
+
+### Gaussian16
+Gaussian16 is available on the group cluster. Typically "gsub input.com" is enough.
+
 
 ## Literature
 

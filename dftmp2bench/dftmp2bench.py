@@ -49,10 +49,10 @@ def generate_input(software, xyz, basis, method, calc="sp", nproc=4):
 
 
 def save_file(software, name, input_str, tag="calc"):
-    file_dir = data_dir / software / tag
+    file_dir = output_dir / tag / software
     if not file_dir.exists():
         file_dir.mkdir(parents=True)
-    with open(file_dir / "{}.inp".format(name), "w") as f:
+    with open(file_dir / "{}.com".format(name), "w") as f:
         f.write(input_str)
 
 
