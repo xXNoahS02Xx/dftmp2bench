@@ -14,7 +14,7 @@ Using uv as a package manager, (pip install uv).
 ```bash
 uv sync
 source .venv/bin/activate
-'''
+```
 Type "deactivate" to deactivate the environment.
 
 Modify "directories.json" to point to the directories containing the output directories of the calculations you want to compare.
