@@ -23,7 +23,7 @@ Include "user" as a way to identify who ran which calculations.
 ## Installing QM software
 
 ### XTB
-
+Download from: https://github.com/grimme-lab/xtb/releases/tag/v6.7.1
 XTB using xyz files as input: "xtb input.xyz"
 
 ### Orca
