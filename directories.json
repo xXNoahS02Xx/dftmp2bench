@@ -1,5 +1,6 @@
 {
   "data": "/pchem-data/meuwly/boittier/dftmp2bench",
   "user": "boittier",
-  "output": "/pchem-data/meuwly/boittier/dftmp2bench/dft-mp2-data"
+  "output": "/pchem-data/meuwly/boittier/dftmp2bench/dft-mp2-data",
+  "xtb": "~/xtb-dist/bin/xtb"
 }
