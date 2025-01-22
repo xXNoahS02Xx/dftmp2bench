@@ -17,7 +17,9 @@ data_dir = Path(directories["data"])
 if "user" not in directories.keys():
     raise ValueError("User directory not found in directories.json")
 user = Path(directories["user"])
-
+if "output" not in directories.keys():
+    raise ValueError("Output directory not found in directories.json")
+output_dir = Path(directories["output"])
 
 softwares = ["orca", "gaussian", "psi4", "xtb"]
 
