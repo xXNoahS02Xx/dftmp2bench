@@ -7,6 +7,11 @@
 
 Compare MP2 vs DFT energies
 
+## Instructions
+
+Modify "directories.json" to point to the directories containing the output directories of the calculations you want to compare.
+Include "user" as a way to identify who ran which calculations.
+
 ## Literature
 
 ```latex
