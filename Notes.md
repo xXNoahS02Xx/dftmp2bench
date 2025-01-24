@@ -1,5 +1,9 @@
- 	![alt text]([image.jpg](https://www.google.com/url?sa=i&url=https%3A%2F%2Fwww.watson.ch%2Fleben%2Ffilm%2F188824316-die-ersten-bilder-vom-set-so-sieht-will-smith-als-genie-in-aladdin-aus&psig=AOvVaw3-ay3yhGB-SVYoOtCkgyC5&ust=1737808891385000&source=images&cd=vfe&opi=89978449&ved=0CBQQjRxqFwoTCPjvxN-wjosDFQAAAAAdAAAAABAI)
+![alt text](https://www.google.com/url?sa=i&url=https%3A%2F%2Fwww.watson.ch%2Fleben%2Ffilm%2F188824316-die-ersten-bilder-vom-set-so-sieht-will-smith-als-genie-in-aladdin-aus&psig=AOvVaw3-ay3yhGB-SVYoOtCkgyC5&ust=1737808891385000&source=images&cd=vfe&opi=89978449&ved=0CBQQjRxqFwoTCPjvxN-wjosDFQAAAAAdAAAAABAI)
 # Notes about job status
+
+Here's a sentence with a footnote. [^1]
+
+[^1]: This is the footnote. 
 
 ! RI-B2PLYP D3BJ def2-TZVP def2-TZVP/C TIGHTSCF
 ! RI-MP2 cc-pVTZ cc-pVTZ/C TIGHTSCF
