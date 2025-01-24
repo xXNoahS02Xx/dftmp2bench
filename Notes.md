@@ -5,9 +5,10 @@ Here's a sentence with a footnote. [^1]
 
 [^1]: This is the footnote. 
 
-! RI-B2PLYP D3BJ def2-TZVP def2-TZVP/C TIGHTSCF
-! RI-MP2 cc-pVTZ cc-pVTZ/C TIGHTSCF
-! DLPNO-CCSD(T) cc-pVTZ cc-pVTZ/C TIGHTSCF
+## Correct basis sets for Orca
+- ! RI-B2PLYP D3BJ def2-TZVP def2-TZVP/C TIGHTSCF
+- ! RI-MP2 cc-pVTZ cc-pVTZ/C TIGHTSCF
+- ! DLPNO-CCSD(T) cc-pVTZ cc-pVTZ/C TIGHTSCF
 
 errors come from AuxC basis set. See 
 and https://sites.google.com/site/orcainputlibrary/coupled-cluster
