@@ -1,3 +1,4 @@
+from uuid import uuid1
 import json
 import ase
 from ase.units import Hartree
@@ -28,9 +29,7 @@ if "xtb" not in directories.keys():
     raise ValueError("XTB executable not found in directories.json")
 xtb_exc = Path(directories["xtb"])
 
-softwares = ["orca", "gaussian", "psi4", 
-        #"xtb"
-        ]
+softwares = ["orca", "gaussian", "psi4", "xtb" ]
 basis_sets = ["def2tzvpp",
 "def2svp",
 "def2svpd",
@@ -95,20 +94,30 @@ def find_out(software, directory):
         output_ext = ".out"
     elif software in ["orca"]:
         output_ext = ".property.txt"
-    output_list = list(directory.glob(".out"))
+    output_list = list(directory.glob(output_ext))
     if len(output_list) != 0:
+        import os
+        output_list.sort(key=lambda x: os.path.getmtime(x))
         return output_list
     return False
 
 def get_output(software, directory, name):
     """
     """
-    o = find_out(software, directory)
+    output_files_list = find_out(software, directory)
+    if not output_files_list:
+        print(f"*** Warning ***\n {name} output in directory {directory} is incomplete or contains errors. Output status = {output_files_list}")
+
     if software == "orca":
-        output = str(name) + ".property.json"
+        #output = str(name) + ".property.json"
+        
+        output_fns = [_ for _ in output_files_list if _.endswith(".property.json")]
+        assert len(output_fns) > 0, "json output missing from orca job"
+        name = output_fns[-1]
+        
         with open(directory / output) as f:
            data = json.load(f)
-        #print(data.keys())
+        
         data["natom"] = data["Geometry_1"]["Calculation_Info"]["NUMOFATOMS"]
         data["nmo"] = data["Geometry_1"]["Calculation_Info"]["NUMOFBASISFUNCTS"]
         data["scfenergies"] = data["Geometry_1"]["Calculation_Info"]["TOTALENERGY"]
@@ -119,7 +128,11 @@ def get_output(software, directory, name):
 
     else:
         
+        output_fns = [_ for _ in output_files_list if _.endswith(".out")]
+        assert len(output_fns) > 0, "json output missing from orca job"
+        name = output_fns[-1]
         output = str(name) + ".out"
+        
         data = cclib.io.ccread(directory / output)
         
         if software == "psi4":
@@ -139,6 +152,7 @@ def get_output(software, directory, name):
         scf_e = data.scfenergies[0]
     else:
         scf_e = data.scfenergies[0]
+    
     print(name, "(", software, ")", "\t\t", wall_time, "secs", "\t", scf_e, "eV")
         
     #print("There are %i atoms and %i MOs" % (data["natom"], data["nmo"]))
@@ -152,7 +166,8 @@ def save_file(software, method, basis, name, input_str, tag="calc"):
     if not file_dir.exists():
         file_dir.mkdir(parents=True)
 
-    fn = file_dir / f"{name}.com"
+    name = f"{name}.{uuid1()}"
+    fn = file_dir / (str(name )+".com")
     if software == "xtb":
         fn = file_dir / "job.sh"
     
@@ -209,8 +224,9 @@ if __name__ == "__main__":
     print_var()
     print(xyz_dir)
     xyzs = list(Path(xyz_dir).glob("*.xyz"))
-    for bs in basis_sets:
-        for m in methods:
-            loop_softwares(xyzs[0], bs, m, args.tag, script_type=args.script)
+    for xyz_ in xyzs:
+        for bs in basis_sets:
+            for m in methods:
+                loop_softwares(xyzs[0], bs, m, args.tag, script_type=args.script)
 
 
