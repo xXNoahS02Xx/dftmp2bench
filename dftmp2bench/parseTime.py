@@ -96,15 +96,20 @@ def parse_time_string(time_string):
     return None
 
 
-# ------------------ Testing the Function ------------------
-examples = [
-    "TOTAL RUN TIME: 0 days 0 hours 0 minutes 0 seconds 684 msec",
-    "Elapsed time: 0 days  0 hours  0 minutes  0.8 seconds.",
-    "Wall Time: 1.10 seconds",
-    "cpu-time:     0 d,  0 h,  0 min,  0.987 sec"
-]
 
-for ex in examples:
-    parsed_seconds = parse_time_string(ex)
-    print(f"Input: {ex!r}\nParsed: {parsed_seconds} seconds\n")
+def run_examples():
+    # ------------------ Testing the Function ------------------
+    examples = [
+        "TOTAL RUN TIME: 0 days 0 hours 0 minutes 0 seconds 684 msec",
+        "Elapsed time: 0 days  0 hours  0 minutes  0.8 seconds.",
+        "Wall Time: 1.10 seconds",
+        "cpu-time:     0 d,  0 h,  0 min,  0.987 sec"
+    ]
+    for ex in examples:
+        parsed_seconds = parse_time_string(ex)
+        print(f"Input: {ex!r}\nParsed: {parsed_seconds} seconds\n")
 
+
+if __name__ == "__main__":
+    run_examples()
+    
