@@ -9,6 +9,7 @@ from ccinput.wrapper import gen_input
 from parseTime import parse_time_string
 from enum import Enum
 import polars as pl
+import datetime
 
 
 class Software(Enum):
@@ -121,6 +122,7 @@ def find_out(software: str, directory: Path) -> list:
 
 def get_output(software: str, directory: Path, name: str) -> dict:
     """
+        finds natom, nmo and scfenergies from all output files and puts them in dict
     """
     basis = str(directory).split("/")[-1]
     level_of_theory = str(directory).split("/")[-2]
@@ -129,49 +131,53 @@ def get_output(software: str, directory: Path, name: str) -> dict:
     if not output_files_list:
         print(f"*** Warning ***\n {name} output in directory {directory} is incomplete or contains errors. Output status = {output_files_list}")
 
-    if software == Software.ORCA:
-        #output = str(name) + ".property.json"
-        #print(output_files_list) 
+    if software == Software.ORCA.value:
+
         output_fns = [_ for _ in output_files_list if str(_).endswith(".property.json")]
         assert len(output_fns) > 0, f"json output missing from orca job ({name}, {directory}, {output_files_list})"
         name = str(output_fns[-1]).replace(".property.json", ".out")
         output = output_fns[-1] 
         with open(directory / output) as f:
-           data = json.load(f)
+           data_dict = json.load(f)
         
-        assert "Geometry_1" in data.keys(), print("Geometry_1 missing in ", data.keys(), directory / output)
-        assert "Calculation_Info" in data["Geometry_1"].keys(), print("Calculation_Info missing in", data["Geometry_1"].keys(), directory / output)
+        assert "Geometry_1" in data_dict.keys(), print("Geometry_1 missing in ", data_dict.keys(), directory / output)
+        assert "Calculation_Info" in data_dict["Geometry_1"].keys(), print("Calculation_Info missing in", data_dict["Geometry_1"].keys(), directory / output)
         # TODO: json should not exist if job is still running 
-        assert data["Calculation_Status"]["STATUS"]  != "RUNNING", f"Is the job {directory/output} still running?"
+        assert data_dict["Calculation_Status"]["STATUS"]  != "RUNNING", f"Is the job {directory/output} still running?"
         
-        data["natom"] = data["Geometry_1"]["Calculation_Info"]["NUMOFATOMS"]
-        data["nmo"] = data["Geometry_1"]["Calculation_Info"]["NUMOFBASISFUNCTS"]
-        data["scfenergies"] = data["Geometry_1"]["Calculation_Info"]["TOTALENERGY"]
-        #print("timings") 
-        # timings
+
+        data_dict["nbasis"] = data_dict["Geometry_1"]["Calculation_Info"]["NUMOFBASISFUNCTS"]
+        data_dict["natom"] = data_dict["Geometry_1"]["Calculation_Info"]["NUMOFATOMS"]
+        # data_dict["nmo"] = data_dict["Geometry_1"]["Calculation_Info"]["NUMOFBASISFUNCTS"]
+        data_dict["scfenergies"] = data_dict["Geometry_1"]["Calculation_Info"]["TOTALENERGY"]
+        nbasis = data_dict["nbasis"]
         with open(directory / (str(name))) as f:
             wall_time = find_walltime(f.readlines())
     else:
+        # not ORCA
         output_fns = [_ for _ in output_files_list if str(_).endswith(".out")]
-        assert len(output_fns) > 0, f"json output missing from orca job, {output_fns}\nJob may still be running?"
+        assert len(output_fns) > 0, f"json output missing from job, {output_fns}\nJob may still be running?"
         name = output_fns[-1]
         output = str(name) 
-        data = cclib.io.ccread(directory / output)
-        if software == "psi4":
+        data_dict_cclib = cclib.io.ccread(directory / output)
+        if software == Software.PSI4.value:
             output = "timer.dat"
         wall_time = find_walltime(open(directory / output).readlines())
+        nbasis = data_dict_cclib.nbasis        
         
-    if software == "orca":
-        scf_e = data["scfenergies"]*Hartree
-    elif software == "xtb":
-        scf_e = data.scfenergies[-1]
+    if software == Software.ORCA.value:
+        scf_e = data_dict["scfenergies"]*Hartree
+    elif software == Software.XTB.value:
+        scf_e = data_dict_cclib.scfenergies[-1]
     else:
-        scf_e = data.scfenergies[-1]
+        scf_e = data_dict_cclib.scfenergies[-1]
 
-    if ("mp" in level_of_theory) and (software is not "orca"):
-        scf_e = data.mpenergies[-1]
-    if ("cc" in level_of_theory) and (software is not "orca"): 
-        scf_e = data.ccenergies[-1]
+    if ("mp" in level_of_theory) and (software != Software.ORCA.value):
+        scf_e = data_dict_cclib.mpenergies[-1]
+    if ("cc" in level_of_theory) and (software != Software.ORCA.value): 
+        scf_e = data_dict_cclib.ccenergies[-1]
+
+    
 
 
     output_dict = {
@@ -180,14 +186,15 @@ def get_output(software: str, directory: Path, name: str) -> dict:
             "wall_time": wall_time,
             "basis": basis,
             "level_of_theory": level_of_theory,
-            "energy": scf_e 
+            "energy": scf_e ,
+            "nbasis": nbasis,
             }
 
     return output_dict
     #print(name, "(", software, ")", "\t\t", wall_time, "secs", "\t", scf_e, "eV")
 
 def save_file(software, method, basis, name, input_str, tag="calc"):
-    if software == "xtb":
+    if software == Software.XTB.value:
         file_dir = output_dir / tag / software / name 
     else:
         file_dir = output_dir / tag / software / name / method / basis 
@@ -197,7 +204,7 @@ def save_file(software, method, basis, name, input_str, tag="calc"):
 
     name = f"{name}.{uuid1()}"
     fn = file_dir / (str(name )+".com")
-    if software == "xtb":
+    if software == Software.XTB.value:
         fn = file_dir / "job.sh"
     
     if fn.exists():
@@ -208,17 +215,17 @@ def save_file(software, method, basis, name, input_str, tag="calc"):
     with open(fn, "w") as f:
         f.write(input_str)
 
-    if software == "orca":
+    if software == Software.ORCA.value:
         job_str = f"module load orca; $ORCA_DIR/orca {name}.com > {name}.out; orca_2json {name} -property"
         job_str = f"sbatch --wrap=\"{job_str}\""
-    if software == "gaussian":
+    if software == Software.GAUSSIAN.value:
         job_str = f"gsub {name}.com"
-    if software == "psi4":
+    if software == Software.PSI4.value:
         job_str = f"conda activate p4env; psi4 {name}.com"
         job_str = f"sbatch --wrap=\"{job_str}\""
     
     fn = file_dir / "job.sh"
-    if not software == "xtb":
+    if not software == Software.XTB.value:
         with open(fn, "w") as f:
             f.write(job_str)
 
@@ -233,9 +240,7 @@ def loop_softwares(xyz, basis, method, tag, script_type="output") -> pl.DataFram
             #print(inp)
             save_file(software, method, basis, xyz.name, inp, tag)
         if script_type == "output":
-
-
-            directory = output_dir / tag / software / name if software == "xtb" else output_dir / tag / software / name / method / basis
+            directory = output_dir / tag / software / name if software == Software.XTB.value else output_dir / tag / software / name / method / basis
             try:
                 output_dictionary = get_output(software, directory, name)
                 job_output.append(output_dictionary)
@@ -245,6 +250,7 @@ def loop_softwares(xyz, basis, method, tag, script_type="output") -> pl.DataFram
                 print(e)
 
     df = pl.DataFrame(job_output)
+    print(f"loopsoftwares: {df}")
     return df
 
 
@@ -281,7 +287,6 @@ if __name__ == "__main__":
     print(dataframes)
     df = pl.concat(dataframes)
 
-    # TODO: think of a better filename...
-    df.write_csv(f"data.csv")
+    date= datetime.date.today()
+    df.write_csv(f"OutputSummary-{date}.csv")
     print(df)
-
