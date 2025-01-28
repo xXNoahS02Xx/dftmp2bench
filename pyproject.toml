@@ -20,7 +20,7 @@ classifiers = [
 ]
 requires-python = ">=3.8"
 dependencies = [
-    "ccinput>=1.11.1", "cclib", "ase", "polars" 
+    "ccinput>=1.11.1", "cclib", "ase", "polars", "jupyter" 
 ]
 # Declare any run-time dependencies that should be installed with the package.
 #dependencies = [
