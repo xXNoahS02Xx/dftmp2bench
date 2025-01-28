@@ -1,13 +1,15 @@
 #!/bin/bash
 ##SBATCH --test-only    # Validate the batch script, job is not submitted.
-#SBATCH -J Energy_S0_Pt_Porphyrin # Job name
+## SBATCH -J orca # Job name
 #SBATCH -o slurm.o%j    # Name of stdout output file
 #SBATCH -e slurm.e%j    # Name of stderr error file
-#SBATCH -p normal       # Queue (partition) name
+#SBATCH -p long       # Queue (partition) name
 #SBATCH -N 1            # Total # of nodes (must be 1 for serial)
-#SBATCH -n 4           # Total # of tasks (should be 1 for serial)
-#SBATCH -t 48:00:00     # Run time (hh:mm:ss)
-#SBATCH -A CHEM****     # Project allocation 
+##SBATCH -n 4           # Total # of tasks (should be 1 for serial)
+##SBATCH -t 48:00:00     # Run time (hh:mm:ss)
+
+# expect to get jobname
+echo $jobname
 
 # Set some internal variables
 JobDir="${SLURM_SUBMIT_DIR}"
@@ -17,6 +19,7 @@ InpDataExt=" hess inp GS.hess TS.hess ES.hess GS TS ES "
 OutExt="out"
 OutDataExt=" prop xyz hess spectrum GS.hess TS.hess ES.hess GS TS ES "
 
+SCRATCH=/scratch/schmidtn
 # To run job on a nodes local filesystem change ${SCRATCH} to /tmp
 ScrBase=${SCRATCH}
 ScrDir="${ScrBase}/${SLURM_JOB_NAME}.${SLURM_JOB_ID}"
@@ -25,23 +28,13 @@ ScrDir="${ScrBase}/${SLURM_JOB_NAME}.${SLURM_JOB_ID}"
 mkdir ${ScrDir}
 
 # Prepend ORCA home directory to PATH and LD_LIBRARY_PATH
-ORCA_DIR=orca_5_0_2_linux_x86-64_shared_openmpi411
-ORCA_HOME=${WORK}/apps/${ORCA_DIR}
-export PATH=${ORCA_HOME}:${PATH}
-export LD_LIBRARY_PATH=${ORCA_HOME}:${LD_LIBRARY_PATH}
-
-# Prepend Openmpi-4.1.1 bin and lib to PATH and LD_LIBRARY_PATH
-OMPI_ROOT=${WORK}/apps/openmpi-4.1.1
-export PATH=${OMPI_ROOT}/bin:$PATH
-export LD_LIBRARY_PATH=${OMPI_ROOT}/lib:$LD_LIBRARY_PATH
-
-# Set Openmpi MCA parameters
-export OMPI_MCA_btl_openib_allow_ib=1
+module load orca
+ORCA_HOME=$ORCA_DIR
 
 # Copy input/data files to ScrDir
 for Ext in ${InpExt} ${InpDataExt} ; do
    if [ -e ${JobDir}/${JobName}.${Ext} ]; then
-      /bin/cp -p ${JobDir}/${JobName}.${Ext} ${ScrDir}
+      cp -p ${JobDir}/${JobName}.${Ext} ${ScrDir}
    fi
 done
 
@@ -55,7 +48,7 @@ cd ${ScrDir}
 # Copy output/data files to JobDir
 for Ext in ${OutExt} ${OutDataExt} ; do
    if [ -e ${ScrDir}/${JobName}.${Ext} ]; then
-      /bin/cp -p ${ScrDir}/${JobName}.${Ext} ${JobDir}
+      cp -p ${ScrDir}/${JobName}.${Ext} ${JobDir}
    fi
 done
 

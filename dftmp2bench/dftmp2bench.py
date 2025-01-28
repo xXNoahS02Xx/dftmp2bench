@@ -1,6 +1,7 @@
 from uuid import uuid1
 import json
 import ase
+import shutil
 from ase.units import Hartree
 from pathlib import Path
 import cclib
@@ -177,9 +178,6 @@ def get_output(software: str, directory: Path, name: str) -> dict:
     if ("cc" in level_of_theory) and (software != Software.ORCA.value): 
         scf_e = data_dict_cclib.ccenergies[-1]
 
-    
-
-
     output_dict = {
             "name": str(name),
             "software": software,
@@ -193,7 +191,7 @@ def get_output(software: str, directory: Path, name: str) -> dict:
     return output_dict
     #print(name, "(", software, ")", "\t\t", wall_time, "secs", "\t", scf_e, "eV")
 
-def save_file(software, method, basis, name, input_str, tag="calc"):
+def save_file(software, method, basis, name, input_str, tag="calc", nproc=1):
     if software == Software.XTB.value:
         file_dir = output_dir / tag / software / name 
     else:
@@ -216,8 +214,17 @@ def save_file(software, method, basis, name, input_str, tag="calc"):
         f.write(input_str)
 
     if software == Software.ORCA.value:
-        job_str = f"module load orca; $ORCA_DIR/orca {name}.com > {name}.out; orca_2json {name} -property"
-        job_str = f"sbatch --wrap=\"{job_str}\""
+        # old method not using scratch
+        # job_str = f"module load orca; $ORCA_DIR/orca {name}.com > {name}.out; orca_2json {name} -property"
+        # job_str = f"sbatch --wrap=\"{job_str}\""
+        
+        # new method using the scratch dir
+        # create the orca job script in the directory
+        shutil.copyfile(current_dir / "data" / "orca-example.sh",
+                        file_dir / "orca.slurm" )
+        job_str = f"sbatch -J {name} -n {nproc} orca.slurm"
+
+
     if software == Software.GAUSSIAN.value:
         job_str = f"gsub {name}.com"
     if software == Software.PSI4.value:
@@ -230,15 +237,15 @@ def save_file(software, method, basis, name, input_str, tag="calc"):
             f.write(job_str)
 
 
-def loop_softwares(xyz, basis, method, tag, script_type="output") -> pl.DataFrame:
+def loop_softwares(xyz, basis, method, tag, script_type="output", nproc=1) -> pl.DataFrame:
     name = str(xyz.name)
     job_output = []
     
     for software in softwares:
         if script_type == "input":
-            inp = generate_input(software, xyz, basis, method)
+            inp = generate_input(software, xyz, basis, method, nproc=nproc)
             #print(inp)
-            save_file(software, method, basis, xyz.name, inp, tag)
+            save_file(software, method, basis, xyz.name, inp, tag, nproc=nproc)
         if script_type == "output":
             directory = output_dir / tag / software / name if software == Software.XTB.value else output_dir / tag / software / name / method / basis
             try:
@@ -268,6 +275,7 @@ if __name__ == "__main__":
 
     parser.add_argument("-s", "--script", type=str, required=True, help="script type = {input / ouput}")
     parser.add_argument("-t", "--tag", type=str, required=False, default="benchmark", help="tag")
+    parser.add_argument("-np", "--nproc", type=int, required=False, default=1, help="number of processors")
 
     args = parser.parse_args()
     
@@ -279,7 +287,9 @@ if __name__ == "__main__":
     for xyz_ in xyzs:
         for bs in basis_sets:
             for m in methods:
-                df = loop_softwares(xyzs[0], bs, m, args.tag, script_type=args.script)
+                df = loop_softwares(xyzs[0], bs, m, args.tag, 
+                                    script_type=args.script,
+                                    nproc=args.nproc)
                 print(df)
                 if len(df):
                     dataframes.append(df)
