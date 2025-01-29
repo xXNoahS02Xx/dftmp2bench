@@ -9,15 +9,17 @@
 ##SBATCH -t 48:00:00     # Run time (hh:mm:ss)
 
 # expect to get jobname
+hostname
+
 echo $jobname
 
 # Set some internal variables
 JobDir="${SLURM_SUBMIT_DIR}"
 JobName="${SLURM_JOB_NAME}"
-InpExt="inp"
+InpExt="com"
 InpDataExt=" hess inp GS.hess TS.hess ES.hess GS TS ES "
 OutExt="out"
-OutDataExt=" prop xyz hess spectrum GS.hess TS.hess ES.hess GS TS ES "
+OutDataExt="property.json prop xyz hess spectrum GS.hess TS.hess ES.hess GS TS ES "
 
 SCRATCH=/scratch/schmidtn
 # To run job on a nodes local filesystem change ${SCRATCH} to /tmp
@@ -25,7 +27,7 @@ ScrBase=${SCRATCH}
 ScrDir="${ScrBase}/${SLURM_JOB_NAME}.${SLURM_JOB_ID}"
 
 # Create job scratch directory
-mkdir ${ScrDir}
+mkdir -p ${ScrDir}
 
 # Prepend ORCA home directory to PATH and LD_LIBRARY_PATH
 module load orca
@@ -45,6 +47,9 @@ cd ${ScrDir}
 
 (/usr/bin/time -p ${ORCA_HOME}/orca ${JobName}.${InpExt} > ${JobName}.${OutExt})
 
+orca_2json $JobName -property
+
+
 # Copy output/data files to JobDir
 for Ext in ${OutExt} ${OutDataExt} ; do
    if [ -e ${ScrDir}/${JobName}.${Ext} ]; then
@@ -53,10 +58,10 @@ for Ext in ${OutExt} ${OutDataExt} ; do
 done
 
 # List contents of ScrDir
-/bin/du -sh ${ScrDir}
-/bin/ls -ltr ${ScrDir}
+du -sh ${ScrDir}
+ls -ltr ${ScrDir}
 
 # Delete ScrDir
-/bin/rm -fr ${ScrDir}
+rm -fr ${ScrDir}
 
 exit

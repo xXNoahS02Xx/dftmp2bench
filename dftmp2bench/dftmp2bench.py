@@ -7,7 +7,7 @@ from pathlib import Path
 import cclib
 import ccinput
 from ccinput.wrapper import gen_input
-from parseTime import parse_time_string
+from dftmp2bench.parseTime import parse_time_string
 from enum import Enum
 import polars as pl
 import datetime
@@ -39,7 +39,10 @@ if "xtb" not in directories.keys():
     raise ValueError("XTB executable not found in directories.json")
 xtb_exc = Path(directories["xtb"])
 
-softwares = ["orca", "gaussian", "psi4", "xtb" ]
+
+# TODO: add option to switch between dft, and post HF methods
+
+softwares = ["orca", "gaussian", ]#"psi4", "xtb" ]
 basis_sets = ["def2tzvpp",
 "def2svp",
 "def2svpd",
@@ -81,9 +84,9 @@ def find_walltime(lines):
 
 
 
-def generate_input(software, xyz, basis, method, calc="sp", nproc=1):
+def generate_input(software, xyz, basis, method, calc="sp", nproc=1, mem=125):
     #print(xyz)
-    if software == "xtb":
+    if software == Software.XTB.value:
        o = str(xyz.name) + ".out"
        return f"{xtb_exc} {str(xyz)} > {o}" 
     else:
@@ -94,6 +97,7 @@ def generate_input(software, xyz, basis, method, calc="sp", nproc=1):
             basis_set=basis,
             file=xyz,
             nproc=nproc,
+            mem=mem,
         )
     return inp
 
@@ -112,7 +116,7 @@ def find_out(software: str, directory: Path) -> list:
     """
     if software in ["gaussian", "psi4", "xtb"]:
         output_ext = ".out"
-    elif software in ["orca"]:
+    elif software in [Software.ORCA.value]:
         output_ext = ".property.json"
     output_list = list(directory.glob("*"+output_ext))
     if len(output_list) != 0:
@@ -144,8 +148,12 @@ def get_output(software: str, directory: Path, name: str) -> dict:
         assert "Geometry_1" in data_dict.keys(), print("Geometry_1 missing in ", data_dict.keys(), directory / output)
         assert "Calculation_Info" in data_dict["Geometry_1"].keys(), print("Calculation_Info missing in", data_dict["Geometry_1"].keys(), directory / output)
         # TODO: json should not exist if job is still running 
-        assert data_dict["Calculation_Status"]["STATUS"]  != "RUNNING", f"Is the job {directory/output} still running?"
-        
+        # print()
+        # assert data_dict["Calculation_Status"]["STATUS"].upper()  == "RUNNING", f"Is the job {directory/output} still running?"
+        assert "NORMAL" in data_dict["Calculation_Status"]["STATUS"].upper(), f"Job {directory/output} did not terminate normally? " \
+            + "calc status:" + data_dict["Calculation_Status"]["STATUS"].upper()
+
+        termination = data_dict["Calculation_Status"]["STATUS"].upper()
 
         data_dict["nbasis"] = data_dict["Geometry_1"]["Calculation_Info"]["NUMOFBASISFUNCTS"]
         data_dict["natom"] = data_dict["Geometry_1"]["Calculation_Info"]["NUMOFATOMS"]
@@ -164,7 +172,10 @@ def get_output(software: str, directory: Path, name: str) -> dict:
         if software == Software.PSI4.value:
             output = "timer.dat"
         wall_time = find_walltime(open(directory / output).readlines())
-        nbasis = data_dict_cclib.nbasis        
+        nbasis = data_dict_cclib.nbasis  
+        # TODO: actually check the termination status, will involve 
+        # loading the output since cclib doesn't store this info
+        termination = "NORMAL TERMINATION"      
         
     if software == Software.ORCA.value:
         scf_e = data_dict["scfenergies"]*Hartree
@@ -178,6 +189,8 @@ def get_output(software: str, directory: Path, name: str) -> dict:
     if ("cc" in level_of_theory) and (software != Software.ORCA.value): 
         scf_e = data_dict_cclib.ccenergies[-1]
 
+
+    # Prod 
     output_dict = {
             "name": str(name),
             "software": software,
@@ -186,10 +199,11 @@ def get_output(software: str, directory: Path, name: str) -> dict:
             "level_of_theory": level_of_theory,
             "energy": scf_e ,
             "nbasis": nbasis,
+            "termination": termination,
             }
 
     return output_dict
-    #print(name, "(", software, ")", "\t\t", wall_time, "secs", "\t", scf_e, "eV")
+
 
 def save_file(software, method, basis, name, input_str, tag="calc", nproc=1):
     if software == Software.XTB.value:
@@ -237,29 +251,34 @@ def save_file(software, method, basis, name, input_str, tag="calc", nproc=1):
             f.write(job_str)
 
 
-def loop_softwares(xyz, basis, method, tag, script_type="output", nproc=1) -> pl.DataFrame:
+def loop_softwares(xyz, basis, method, tag, script_type="output", nproc=1, mem=125) -> pl.DataFrame | None:
     name = str(xyz.name)
     job_output = []
     
     for software in softwares:
         if script_type == "input":
-            inp = generate_input(software, xyz, basis, method, nproc=nproc)
+            # print("Running in input mode")
+            inp = generate_input(software, xyz, basis, method, 
+                                 nproc=nproc, mem=mem)
             #print(inp)
             save_file(software, method, basis, xyz.name, inp, tag, nproc=nproc)
+        
         if script_type == "output":
+            # print("Running in output mode")
+
             directory = output_dir / tag / software / name if software == Software.XTB.value else output_dir / tag / software / name / method / basis
             try:
                 output_dictionary = get_output(software, directory, name)
                 job_output.append(output_dictionary)
 
             except (AssertionError, AttributeError, json.decoder.JSONDecodeError) as e:
-                print(f"Job: {software} {basis} {method} {name}")
-                print(e)
-
-    df = pl.DataFrame(job_output)
-    print(f"loopsoftwares: {df}")
-    return df
-
+                print(f"ERROR -- Job: {software} {basis} {method} {name}")
+                print("exception: ", e)
+    
+    if script_type == "output":
+        df = pl.DataFrame(job_output)
+        if df is not None:
+            return df
 
 
 
@@ -274,11 +293,17 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Write, run, and benchmark QM calculations")
 
     parser.add_argument("-s", "--script", type=str, required=True, help="script type = {input / ouput}")
-    parser.add_argument("-t", "--tag", type=str, required=False, default="benchmark", help="tag")
+    parser.add_argument("-t", "--tag", type=str, 
+                        required=False, default="benchmark", help="tag")
     parser.add_argument("-np", "--nproc", type=int, required=False, default=1, help="number of processors")
+    parser.add_argument("-m", "--mem", type=int, required=False, default=125, help="number of processors")
+
+    # TODO: by default, do all programs... but add an option to do only a selected group of programs
+    # TODO: add option to switch between dft, and post HF methods
+
 
     args = parser.parse_args()
-    
+    print(args)
     print_var()
     
     dataframes = []
@@ -287,16 +312,18 @@ if __name__ == "__main__":
     for xyz_ in xyzs:
         for bs in basis_sets:
             for m in methods:
-                df = loop_softwares(xyzs[0], bs, m, args.tag, 
+                df = loop_softwares(xyz_, bs, m, args.tag, 
                                     script_type=args.script,
-                                    nproc=args.nproc)
-                print(df)
-                if len(df):
-                    dataframes.append(df)
+                                    nproc=args.nproc,
+                                    mem=args.mem)
+                if args.script == "output":
+                    # print(df)
+                    if len(df):
+                        dataframes.append(df)
 
-    print(dataframes)
-    df = pl.concat(dataframes)
-
-    date= datetime.date.today()
-    df.write_csv(f"OutputSummary-{date}.csv")
-    print(df)
+    if args.script == "output":
+        # print(dataframes)
+        df = pl.concat(dataframes)
+        date= datetime.date.today()
+        df.write_csv(f"OutputSummary-{date}.csv")
+        print(df)
