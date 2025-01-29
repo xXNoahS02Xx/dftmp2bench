@@ -7,6 +7,9 @@ from pathlib import Path
 import cclib
 import ccinput
 from ccinput.wrapper import gen_input
+
+
+import dftmp2bench
 from dftmp2bench.parseTime import parse_time_string
 from enum import Enum
 import polars as pl
@@ -325,5 +328,5 @@ if __name__ == "__main__":
         # print(dataframes)
         df = pl.concat(dataframes)
         date= datetime.date.today()
-        df.write_csv(f"OutputSummary-{date}.csv")
+        df.write_csv(f"csvs/summary-{args.tag}-{date}-{uuid1()}.csv")
         print(df)
