@@ -101,7 +101,7 @@ def find_walltime(lines):
     return max(times)
 
 
-def generate_input(software, xyz, basis, method, calc="sp", nproc=1, mem=125) -> str:
+def generate_input(software, xyz, basis, method, calc="sp", nproc=1, mem=1000) -> str:
     """Create the input file using ccinput"""
     if software == Software.XTB.value:
         o = str(xyz.name) + ".out"
@@ -133,7 +133,7 @@ def find_out(software: str, directory: Path) -> list:
     directory: Path
         - path to the output file directory
     """
-    if software in ["gaussian", "psi4", "xtb"]:
+    if software in [Software.GAUSSIAN.value, Software.PSI4.value, Software.XTB.value ]:
         output_ext = ".out"
     elif software in [Software.ORCA.value]:
         output_ext = ".property.json"
@@ -152,6 +152,7 @@ def get_output(software: str, directory: Path, name: str) -> dict:
     """
     basis = str(directory).split("/")[-1]
     level_of_theory = str(directory).split("/")[-2]
+    molecule_name = str(directory).split("/")[-3]
 
     output_files_list = find_out(software, directory)
     if not output_files_list:
@@ -232,6 +233,7 @@ def get_output(software: str, directory: Path, name: str) -> dict:
     # Prod
     output_dict = {
         "name": str(name),
+        "molecule_name": molecule_name,
         "software": software,
         "wall_time": wall_time,
         "basis": basis,
@@ -244,7 +246,7 @@ def get_output(software: str, directory: Path, name: str) -> dict:
     return output_dict
 
 
-def save_file(software, method, basis, name, input_str, tag="calc", nproc=1):
+def save_file(software, method, basis, name, input_str, tag="calc", nproc=1, mem=1000):
     if software == Software.XTB.value:
         file_dir = output_dir / tag / software / name
     else:
@@ -276,10 +278,11 @@ def save_file(software, method, basis, name, input_str, tag="calc", nproc=1):
         shutil.copyfile(
             current_dir / "data" / "orca-example.sh", file_dir / "orca.slurm"
         )
-        job_str = f"sbatch -J {name} -n {nproc} orca.slurm"
+        job_str = f"sbatch -J {name} -n {nproc} --mem {mem} orca.slurm" # where mem is mem per node in MB
 
     if software == Software.GAUSSIAN.value:
         job_str = f"gsub {name}.com"
+        
     if software == Software.PSI4.value:
         job_str = f"conda activate p4env; psi4 {name}.com"
         job_str = f'sbatch --wrap="{job_str}"'
@@ -291,7 +294,7 @@ def save_file(software, method, basis, name, input_str, tag="calc", nproc=1):
 
 
 def loop_softwares(
-    xyz, basis, method, tag, script_type="output", nproc=1, mem=125
+    xyz, basis, method, tag, script_type="output", nproc=1, mem=1000
 ) -> pl.DataFrame | None:
     name = str(xyz.name)
     job_output = []
@@ -299,7 +302,7 @@ def loop_softwares(
     for software in softwares:
         if script_type == "input":
             inp = generate_input(software, xyz, basis, method, nproc=nproc, mem=mem)
-            save_file(software, method, basis, xyz.name, inp, tag, nproc=nproc)
+            save_file(software, method, basis, xyz.name, inp, tag, nproc=nproc, mem=mem)
 
         if script_type == "output":
 
@@ -354,7 +357,7 @@ if __name__ == "__main__":
         "--mem",
         type=int,
         required=False,
-        default=125,
+        default=1000,
         help="number of processors",
     )
 
