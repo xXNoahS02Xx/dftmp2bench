@@ -219,7 +219,7 @@ def get_output(software: str, directory: Path, name: str) -> dict:
         termination = "NORMAL TERMINATION"
 
     if software == Software.ORCA.value:
-        scf_e = data_dict["scfenergies"] * Hartree
+        scf_e = data_dict["scfenergies"] * Hartree # converts from Hatree to eV according to ASE
     elif software == Software.XTB.value:
         scf_e = data_dict_cclib.scfenergies[-1]
     else:

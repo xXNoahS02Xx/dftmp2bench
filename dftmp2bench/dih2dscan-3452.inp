@@ -1,0 +1,9 @@
+$constrain
+ force constant=0.1
+ dihedral: 32,18,15,13, auto
+ dihedral: 18,15,13,8, auto
+$scan
+ mode=sequential
+ 1:  441.0, 447.0, 2
+ 2: 186.0, 186.0, 2
+$end
