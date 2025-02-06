@@ -19,7 +19,7 @@ JobName="${SLURM_JOB_NAME}"
 InpExt="com"
 InpDataExt=" hess inp GS.hess TS.hess ES.hess GS TS ES "
 OutExt="out"
-OutDataExt="property.json prop xyz hess spectrum GS.hess TS.hess ES.hess GS TS ES "
+OutDataExt="property.json gbw prop xyz hess spectrum GS.hess TS.hess ES.hess GS TS ES "
 
 SCRATCH=/scratch/schmidtn
 # To run job on a nodes local filesystem change ${SCRATCH} to /tmp
@@ -44,11 +44,10 @@ done
 cd ${ScrDir}
 
 # Run ORCA
-
 (/usr/bin/time -p ${ORCA_HOME}/orca ${JobName}.${InpExt} > ${JobName}.${OutExt})
 
+# convert to json
 orca_2json $JobName -property
-
 
 # Copy output/data files to JobDir
 for Ext in ${OutExt} ${OutDataExt} ; do

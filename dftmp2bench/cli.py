@@ -6,6 +6,7 @@ from ase.units import Hartree
 from pathlib import Path
 import cclib
 import ccinput
+from ccinput.constants import SOFTWARE_BASIS_SETS
 from ccinput.wrapper import gen_input
 
 
@@ -48,39 +49,38 @@ xtb_exc = Path(directories["xtb"])
 
 softwares = [
     "orca",
-    "gaussian",
+    # "gaussian",
 ]  # TODO: "psi4", "xtb" ]
 basis_sets = [
-    "def2tzvpp",
+    # "def2tzvpp",
     "def2svp",
-    "def2svpd",
-    "ccpvdz",
-    "ccpvdzpp",
-    "ccpvtzf12",
-    "631+gd",
-    "631+gdp",
-    "6311++g2d2p",
-    "sto3g",
+    # "def2svpd",
+    # "ccpvdz",
+    # "ccpvdzpp",
+    # "ccpvtzf12",
+    #"631+gd",
+    # "631+gdp",
+    # "6311++g2d2p",
+    # "sto3g",
 ]
 methods = [
-    "hf",
-    "ccsd",
-    "r2scan-3c",
-    "b973c",
-    "mp2",
-    "rimp2",
+    # "hf",
+    # "ccsd",
+    # # "r2scan-3c",
+    # # "b973c",
+    # "mp2",
+    # "rimp2",
     "pbe0",
-    "PBEh-3c",
-    "wb97xv",
-    "wb97xd3",
-    "wb97xd3bj",
-    "m062x",
-    "camb3lyp",
-    "b2plyp",
-    "dlpnoccsd",
-    "dlpnoccsdt",
+    # "PBEh-3c",
+    # # "wb97xv",
+    # # "wb97xd3",
+    # # "wb97xd3bj",
+    # # "m062x",
+    # # "camb3lyp",
+    # "b2plyp",
+    # # "dlpnoccsd",
+    # # "dlpnoccsdt",
 ]
-
 
 xyz_dir = current_dir / "data" / "xyzs"
 xyzfilename = xyz_dir / "ala0.xyz"
@@ -101,12 +101,16 @@ def find_walltime(lines):
     return max(times)
 
 
-def generate_input(software, xyz, basis, method, calc="sp", nproc=1, mem=1000) -> str:
+def generate_input(software, xyz, basis, method, calc="sp", nproc=1, mem=1000, frz=[]) -> str:
     """Create the input file using ccinput"""
     if software == Software.XTB.value:
         o = str(xyz.name) + ".out"
         return f"{xtb_exc} {str(xyz)} > {o}"
     else:
+        frz = [[int(i) for i in _.split("-")] for _ in frz]
+        if len(frz) > 0:
+            calc = "constr_opt"
+        print(frz)
         inp = gen_input(
             software=software,
             type=calc,
@@ -116,7 +120,16 @@ def generate_input(software, xyz, basis, method, calc="sp", nproc=1, mem=1000) -
             parse_name=True,
             nproc=nproc,
             mem=mem,
+            freeze=frz, 
         )
+        # check B2PLYP
+        if method == "b2plyp":
+            _b = SOFTWARE_BASIS_SETS["orca"][basis]
+            inp = inp.replace(_b, f"{_b} {_b}/C")
+        # if yes, add 
+        print(inp)
+
+
     return inp
 
 
@@ -201,6 +214,23 @@ def get_output(software: str, directory: Path, name: str) -> dict:
         nbasis = data_dict["nbasis"]
         with open(directory / (str(name))) as f:
             wall_time = find_walltime(f.readlines())
+
+
+        # TODO: save the forces... this needs to be reshaped from 3N to N x 3(i.e. grad_np_array.reshape(N,3))
+        # not sure how we save this in a dataframe, maybe it works better in polars... worst comes to worst we save as .npz (np.savez())
+        # remember to get the last geometry index
+        """ "PropertyName" : "MP2_Nuc_Gradient",
+        "GeometryIndex" : 11,
+        "NATOMS" : 126 ,
+        "GRADNORM" :       5.9986348742056600e-04, 
+        "GRAD" : [
+        [          -5.493989884393e-05],
+        [          -3.737129568003e-05],
+        [           2.401425227847e-05],
+        [           9.268457614467e-06],
+        """
+
+
     else:
         # not ORCA
         output_fns = [_ for _ in output_files_list if str(_).endswith(".out")]
@@ -294,14 +324,14 @@ def save_file(software, method, basis, name, input_str, tag="calc", nproc=1, mem
 
 
 def loop_softwares(
-    xyz, basis, method, tag, script_type="output", nproc=1, mem=1000
+    xyz, basis, method, tag, script_type="output", nproc=1, mem=1000, frz=[],
 ) -> pl.DataFrame | None:
     name = str(xyz.name)
     job_output = []
 
     for software in softwares:
         if script_type == "input":
-            inp = generate_input(software, xyz, basis, method, nproc=nproc, mem=mem)
+            inp = generate_input(software, xyz, basis, method, nproc=nproc, mem=mem, frz=frz)
             save_file(software, method, basis, xyz.name, inp, tag, nproc=nproc, mem=mem)
 
         if script_type == "output":
@@ -341,9 +371,20 @@ if __name__ == "__main__":
     parser.add_argument(
         "-s", "--script", type=str, required=True, help="script type = {input / ouput}"
     )
+
     parser.add_argument(
         "-t", "--tag", type=str, required=False, default="benchmark", help="tag"
     )
+
+    parser.add_argument(
+        "-fnr", "--fnr", type=str, required=False, default="*", help="regular expression to select filenames (fnr = filename-regrex)"
+    )   
+
+    parser.add_argument(
+        "-frz", "--frz", type=str, required=False, default=[], nargs="+", 
+        help="Freeze specified distance/angle/dihedral between the specified atoms, e.g. --frz 4-3-2 2-3 (has to be more than 1 and less than 5)"
+    )
+
     parser.add_argument(
         "-np",
         "--nproc",
@@ -358,7 +399,7 @@ if __name__ == "__main__":
         type=int,
         required=False,
         default=1000,
-        help="number of processors",
+        help="amount of total memory in mB",
     )
 
     # TODO: by default, do all programs... but add an option to do only a selected group of programs
@@ -370,7 +411,7 @@ if __name__ == "__main__":
 
     dataframes = []
 
-    xyzs = list(Path(xyz_dir).glob("*.xyz"))
+    xyzs = list(Path(xyz_dir).glob(f"{args.fnr}"))
     for xyz_ in xyzs:
         for bs in basis_sets:
             for m in methods:
@@ -382,6 +423,7 @@ if __name__ == "__main__":
                     script_type=args.script,
                     nproc=args.nproc,
                     mem=args.mem,
+                    frz=args.frz,
                 )
                 if args.script == "output":
                     if len(df):
