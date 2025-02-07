@@ -102,3 +102,18 @@ def run_examples():
 
 if __name__ == "__main__":
     run_examples()
+
+
+def find_walltime(lines):
+    time_str = False
+    line_numbers = [i for i, _ in enumerate(lines) if "time:" in _.lower()]
+    assert len(line_numbers) > 0, "Error, no timings found!"
+    # for _ in line_numbers:
+    #    line_numbers.append(_+1)
+    lines = [lines[i] for i in line_numbers]
+    # print(lines)
+    # print(lines[-1])
+    times = [parse_time_string(_) for _ in lines if parse_time_string(_) is not None]
+    # print(times)
+    assert len(times) > 0, "Error, no timings found!"
+    return max(times)

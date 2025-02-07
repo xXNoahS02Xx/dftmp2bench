@@ -1,0 +1,4 @@
+name,molecule_name,software,wall_time,basis,level_of_theory,energy,nbasis,termination
+/cluster/home/schmidtn/master/wahlprak/dft-mp2-data/charge_test2/orca/AKA_cation_singlet.xyz/pbe0/def2svp/AKA_cation_singlet.xyz.c7f005f4-dfd5-11ef-8425-5379090b8daf.out,AKA_cation_singlet.xyz,orca,274.845,def2svp,pbe0,-26946.354188687343,405,NORMAL TERMINATION
+/cluster/home/schmidtn/master/wahlprak/dft-mp2-data/charge_test2/orca/AKA_W5_cation_singlet.xyz/pbe0/def2svp/AKA_W5_cation_singlet.xyz.c7f00734-dfd5-11ef-8425-5379090b8daf.out,AKA_W5_cation_singlet.xyz,orca,408.277,def2svp,pbe0,-37328.09624699725,525,NORMAL TERMINATION
+/cluster/home/schmidtn/master/wahlprak/dft-mp2-data/charge_test2/orca/ALA_neutral_singlet.xyz/pbe0/def2svp/ALA_neutral_singlet.xyz.c7f00874-dfd5-11ef-8425-5379090b8daf.out,ALA_neutral_singlet.xyz,orca,250.498,def2svp,pbe0,-25430.43862844961,381,NORMAL TERMINATION

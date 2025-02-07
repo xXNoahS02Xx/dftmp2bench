@@ -9,7 +9,7 @@ from dftmp2bench.cli import xyz_dir
 
 def get_charge_multiplicity(atoms: ase.Atoms) -> (int, int):
     """see function name
-    
+
     returns (int, int) for charge and multiplicity
 
     """
@@ -20,13 +20,13 @@ def get_charge_multiplicity(atoms: ase.Atoms) -> (int, int):
                 return charge, multiplicity
     return None
 
+
 def verify_charge_mult(electrons, charge, multiplicity):
     """Verifies that the requested charge and multiplicity are possible for the structure"""
     electrons -= charge
     odd_e = electrons % 2
     odd_m = multiplicity % 2
-    return (odd_e != odd_m)
-
+    return odd_e != odd_m
 
 
 xyzs = list(Path(xyz_dir).glob("*.xyz"))

@@ -17,11 +17,14 @@ import polars as pl
 import datetime
 
 
-class Software(Enum):
-    PSI4 = "psi4"
-    GAUSSIAN = "gaussian"
-    ORCA = "orca"
-    XTB = "xtb"
+from dftmp2bench.constants import basis_sets
+from dftmp2bench.constants import methods
+from dftmp2bench.constants import print_var
+from dftmp2bench.bench import make_csv
+from dftmp2bench.bench import loop_jobs
+
+
+
 
 
 current_dir = Path(__file__).parent
@@ -47,318 +50,12 @@ xtb_exc = Path(directories["xtb"])
 
 # TODO: add option to switch between dft, and post HF methods
 
-softwares = [
-    "orca",
-    # "gaussian",
-]  # TODO: "psi4", "xtb" ]
-basis_sets = [
-    # "def2tzvpp",
-    "def2svp",
-    # "def2svpd",
-    # "ccpvdz",
-    # "ccpvdzpp",
-    # "ccpvtzf12",
-    #"631+gd",
-    # "631+gdp",
-    # "6311++g2d2p",
-    # "sto3g",
-]
-methods = [
-    # "hf",
-    # "ccsd",
-    # # "r2scan-3c",
-    # # "b973c",
-    # "mp2",
-    # "rimp2",
-    "pbe0",
-    # "PBEh-3c",
-    # # "wb97xv",
-    # # "wb97xd3",
-    # # "wb97xd3bj",
-    # # "m062x",
-    # # "camb3lyp",
-    # "b2plyp",
-    # # "dlpnoccsd",
-    # # "dlpnoccsdt",
-]
 
-xyz_dir = current_dir / "data" / "xyzs"
+
+
+xyz_dir = current_dir / ".." / "data" / "xyzs"
 xyzfilename = xyz_dir / "ala0.xyz"
 
-
-def find_walltime(lines):
-    time_str = False
-    line_numbers = [i for i, _ in enumerate(lines) if "time:" in _.lower()]
-    assert len(line_numbers) > 0, "Error, no timings found!"
-    # for _ in line_numbers:
-    #    line_numbers.append(_+1)
-    lines = [lines[i] for i in line_numbers]
-    # print(lines)
-    # print(lines[-1])
-    times = [parse_time_string(_) for _ in lines if parse_time_string(_) is not None]
-    # print(times)
-    assert len(times) > 0, "Error, no timings found!"
-    return max(times)
-
-
-def generate_input(software, xyz, basis, method, calc="sp", nproc=1, mem=1000, frz=[]) -> str:
-    """Create the input file using ccinput"""
-    if software == Software.XTB.value:
-        o = str(xyz.name) + ".out"
-        return f"{xtb_exc} {str(xyz)} > {o}"
-    else:
-        frz = [[int(i) for i in _.split("-")] for _ in frz]
-        if len(frz) > 0:
-            calc = "constr_opt"
-        print(frz)
-        inp = gen_input(
-            software=software,
-            type=calc,
-            method=method,
-            basis_set=basis,
-            file=str(xyz),
-            parse_name=True,
-            nproc=nproc,
-            mem=mem,
-            freeze=frz, 
-        )
-        # check B2PLYP
-        if method == "b2plyp":
-            _b = SOFTWARE_BASIS_SETS["orca"][basis]
-            inp = inp.replace(_b, f"{_b} {_b}/C")
-        # if yes, add 
-        print(inp)
-
-
-    return inp
-
-
-def raise_output_exists(out):
-    raise ValueError("output {out} exists!")
-
-
-def find_out(software: str, directory: Path) -> list:
-    """Find the output files and return them in a cronologically order list.
-    If no output files are present return an empty list
-
-    software: str
-        - name of the software, either gaussian, psi4, xtb or orca
-    directory: Path
-        - path to the output file directory
-    """
-    if software in [Software.GAUSSIAN.value, Software.PSI4.value, Software.XTB.value ]:
-        output_ext = ".out"
-    elif software in [Software.ORCA.value]:
-        output_ext = ".property.json"
-    output_list = list(directory.glob("*" + output_ext))
-    if len(output_list) != 0:
-        import os
-
-        output_list.sort(key=lambda x: os.path.getmtime(x))
-        return output_list
-    return []
-
-
-def get_output(software: str, directory: Path, name: str) -> dict:
-    """
-    finds natom, nmo and scfenergies from all output files and puts them in dict
-    """
-    basis = str(directory).split("/")[-1]
-    level_of_theory = str(directory).split("/")[-2]
-    molecule_name = str(directory).split("/")[-3]
-
-    output_files_list = find_out(software, directory)
-    if not output_files_list:
-        print(
-            f"*** Warning ***\n {name} output in directory {directory} is incomplete or contains errors. Output status = {output_files_list}"
-        )
-
-    if software == Software.ORCA.value:
-
-        output_fns = [_ for _ in output_files_list if str(_).endswith(".property.json")]
-        assert (
-            len(output_fns) > 0
-        ), f"json output missing from orca job ({name}, {directory}, {output_files_list})"
-        name = str(output_fns[-1]).replace(".property.json", ".out")
-        output = output_fns[-1]
-        with open(directory / output) as f:
-            data_dict = json.load(f)
-
-        assert "Geometry_1" in data_dict.keys(), print(
-            "Geometry_1 missing in ", data_dict.keys(), directory / output
-        )
-        assert "Calculation_Info" in data_dict["Geometry_1"].keys(), print(
-            "Calculation_Info missing in",
-            data_dict["Geometry_1"].keys(),
-            directory / output,
-        )
-        # TODO: json should not exist if job is still running
-        # print()
-        # assert data_dict["Calculation_Status"]["STATUS"].upper()  == "RUNNING", f"Is the job {directory/output} still running?"
-        assert "NORMAL" in data_dict["Calculation_Status"]["STATUS"].upper(), (
-            f"Job {directory/output} did not terminate normally? "
-            + "calc status:"
-            + data_dict["Calculation_Status"]["STATUS"].upper()
-        )
-
-        termination = data_dict["Calculation_Status"]["STATUS"].upper()
-
-        data_dict["nbasis"] = data_dict["Geometry_1"]["Calculation_Info"][
-            "NUMOFBASISFUNCTS"
-        ]
-        data_dict["natom"] = data_dict["Geometry_1"]["Calculation_Info"]["NUMOFATOMS"]
-        # data_dict["nmo"] = data_dict["Geometry_1"]["Calculation_Info"]["NUMOFBASISFUNCTS"]
-        data_dict["scfenergies"] = data_dict["Geometry_1"]["Calculation_Info"][
-            "TOTALENERGY"
-        ]
-        nbasis = data_dict["nbasis"]
-        with open(directory / (str(name))) as f:
-            wall_time = find_walltime(f.readlines())
-
-
-        # TODO: save the forces... this needs to be reshaped from 3N to N x 3(i.e. grad_np_array.reshape(N,3))
-        # not sure how we save this in a dataframe, maybe it works better in polars... worst comes to worst we save as .npz (np.savez())
-        # remember to get the last geometry index
-        """ "PropertyName" : "MP2_Nuc_Gradient",
-        "GeometryIndex" : 11,
-        "NATOMS" : 126 ,
-        "GRADNORM" :       5.9986348742056600e-04, 
-        "GRAD" : [
-        [          -5.493989884393e-05],
-        [          -3.737129568003e-05],
-        [           2.401425227847e-05],
-        [           9.268457614467e-06],
-        """
-
-
-    else:
-        # not ORCA
-        output_fns = [_ for _ in output_files_list if str(_).endswith(".out")]
-        assert (
-            len(output_fns) > 0
-        ), f"json output missing from job, {output_fns}\nJob may still be running?"
-        name = output_fns[-1]
-        output = str(name)
-        data_dict_cclib = cclib.io.ccread(directory / output)
-        if software == Software.PSI4.value:
-            output = "timer.dat"
-        wall_time = find_walltime(open(directory / output).readlines())
-        nbasis = data_dict_cclib.nbasis
-        # TODO: actually check the termination status, will involve
-        # loading the output since cclib doesn't store this info
-        termination = "NORMAL TERMINATION"
-
-    if software == Software.ORCA.value:
-        scf_e = data_dict["scfenergies"] * Hartree # converts from Hatree to eV according to ASE
-    elif software == Software.XTB.value:
-        scf_e = data_dict_cclib.scfenergies[-1]
-    else:
-        scf_e = data_dict_cclib.scfenergies[-1]
-
-    if ("mp" in level_of_theory) and (software != Software.ORCA.value):
-        scf_e = data_dict_cclib.mpenergies[-1]
-    if ("cc" in level_of_theory) and (software != Software.ORCA.value):
-        scf_e = data_dict_cclib.ccenergies[-1]
-
-    # Prod
-    output_dict = {
-        "name": str(name),
-        "molecule_name": molecule_name,
-        "software": software,
-        "wall_time": wall_time,
-        "basis": basis,
-        "level_of_theory": level_of_theory,
-        "energy": scf_e,
-        "nbasis": nbasis,
-        "termination": termination,
-    }
-
-    return output_dict
-
-
-def save_file(software, method, basis, name, input_str, tag="calc", nproc=1, mem=1000):
-    if software == Software.XTB.value:
-        file_dir = output_dir / tag / software / name
-    else:
-        file_dir = output_dir / tag / software / name / method / basis
-
-    if not file_dir.exists():
-        file_dir.mkdir(parents=True)
-
-    name = f"{name}.{uuid1()}"
-    fn = file_dir / (str(name) + ".com")
-    if software == Software.XTB.value:
-        fn = file_dir / "job.sh"
-
-    if fn.exists():
-        return
-    if find_out(software, file_dir):
-        print(f"{name} output file(s) already exist(s)")
-        return
-    with open(fn, "w") as f:
-        f.write(input_str)
-
-    if software == Software.ORCA.value:
-        # old method not using scratch
-        # job_str = f"module load orca; $ORCA_DIR/orca {name}.com > {name}.out; orca_2json {name} -property"
-        # job_str = f"sbatch --wrap=\"{job_str}\""
-
-        # new method using the scratch dir
-        # create the orca job script in the directory
-        shutil.copyfile(
-            current_dir / "data" / "orca-example.sh", file_dir / "orca.slurm"
-        )
-        job_str = f"sbatch -J {name} -n {nproc} --mem {mem} orca.slurm" # where mem is mem per node in MB
-
-    if software == Software.GAUSSIAN.value:
-        job_str = f"gsub {name}.com"
-        
-    if software == Software.PSI4.value:
-        job_str = f"conda activate p4env; psi4 {name}.com"
-        job_str = f'sbatch --wrap="{job_str}"'
-
-    fn = file_dir / "job.sh"
-    if not software == Software.XTB.value:
-        with open(fn, "w") as f:
-            f.write(job_str)
-
-
-def loop_softwares(
-    xyz, basis, method, tag, script_type="output", nproc=1, mem=1000, frz=[],
-) -> pl.DataFrame | None:
-    name = str(xyz.name)
-    job_output = []
-
-    for software in softwares:
-        if script_type == "input":
-            inp = generate_input(software, xyz, basis, method, nproc=nproc, mem=mem, frz=frz)
-            save_file(software, method, basis, xyz.name, inp, tag, nproc=nproc, mem=mem)
-
-        if script_type == "output":
-
-            directory = (
-                output_dir / tag / software / name
-                if software == Software.XTB.value
-                else output_dir / tag / software / name / method / basis
-            )
-            try:
-                output_dictionary = get_output(software, directory, name)
-                job_output.append(output_dictionary)
-
-            except (AssertionError, AttributeError, json.decoder.JSONDecodeError) as e:
-                print(f"ERROR -- Job: {software} {basis} {method} {name}")
-                print("exception: ", e)
-
-    if script_type == "output":
-        df = pl.DataFrame(job_output)
-        if df is not None:
-            return df
-
-
-def print_var():
-    print("User:", user)
-    print("Data:", data_dir)
-    print("Output:", output_dir)
 
 
 if __name__ == "__main__":
@@ -377,12 +74,22 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "-fnr", "--fnr", type=str, required=False, default="*", help="regular expression to select filenames (fnr = filename-regrex)"
-    )   
+        "-fnr",
+        "--fnr",
+        type=str,
+        required=False,
+        default="*",
+        help="regular expression to select filenames (fnr = filename-regrex)",
+    )
 
     parser.add_argument(
-        "-frz", "--frz", type=str, required=False, default=[], nargs="+", 
-        help="Freeze specified distance/angle/dihedral between the specified atoms, e.g. --frz 4-3-2 2-3 (has to be more than 1 and less than 5)"
+        "-frz",
+        "--frz",
+        type=str,
+        required=False,
+        default=[],
+        nargs="+",
+        help="Freeze specified distance/angle/dihedral between the specified atoms, e.g. --frz 4-3-2 2-3 (has to be more than 1 and less than 5)",
     )
 
     parser.add_argument(
@@ -407,30 +114,14 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     print(args)
-    print_var()
+    print_var(user, data_dir, output_dir)
 
-    dataframes = []
 
-    xyzs = list(Path(xyz_dir).glob(f"{args.fnr}"))
-    for xyz_ in xyzs:
-        for bs in basis_sets:
-            for m in methods:
-                df = loop_softwares(
-                    xyz_,
-                    bs,
-                    m,
-                    args.tag,
-                    script_type=args.script,
-                    nproc=args.nproc,
-                    mem=args.mem,
-                    frz=args.frz,
-                )
-                if args.script == "output":
-                    if len(df):
-                        dataframes.append(df)
+    #print("cli")########################################################################################
+    dataframes = loop_jobs(args, xyz_dir, output_dir, current_dir, xtb_exc)
+
+
 
     if args.script == "output":
-        df = pl.concat(dataframes)
-        date = datetime.date.today()
-        df.write_csv(f"csvs/summary-{args.tag}-{date}-{uuid1()}.csv")
+        df = make_csv(args, dataframes)
         print(df)
