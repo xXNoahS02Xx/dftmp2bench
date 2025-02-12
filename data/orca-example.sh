@@ -40,6 +40,8 @@ for Ext in ${InpExt} ${InpDataExt} ; do
    fi
 done
 
+
+
 # Change to scratch directory
 cd ${ScrDir}
 
@@ -55,6 +57,8 @@ for Ext in ${OutExt} ${OutDataExt} ; do
       cp -p ${ScrDir}/${JobName}.${Ext} ${JobDir}
    fi
 done
+
+cp *xyz ${JobDir}
 
 # List contents of ScrDir
 du -sh ${ScrDir}

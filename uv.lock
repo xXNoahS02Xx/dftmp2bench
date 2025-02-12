@@ -811,6 +811,7 @@ dependencies = [
     { name = "polars", version = "1.21.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.9'" },
     { name = "pyarrow", version = "17.0.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.9'" },
     { name = "pyarrow", version = "19.0.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.9'" },
+    { name = "pyzorder" },
     { name = "statsmodels", version = "0.14.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.9'" },
     { name = "statsmodels", version = "0.14.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.9'" },
 ]
@@ -831,6 +832,7 @@ requires-dist = [
     { name = "polars" },
     { name = "pyarrow" },
     { name = "pytest", marker = "extra == 'test'", specifier = ">=6.1.2" },
+    { name = "pyzorder" },
     { name = "statsmodels" },
 ]
 
@@ -3293,6 +3295,12 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/9b/a9/50c9c06762b30792f71aaad8d1886748d39c4bffedc1171fbc6ad2b92d67/pyzmq-26.2.0-pp39-pypy39_pp73-manylinux_2_28_x86_64.whl", hash = "sha256:6a96179a24b14fa6428cbfc08641c779a53f8fcec43644030328f44034c7f1f4", size = 751338 },
     { url = "https://files.pythonhosted.org/packages/ca/63/27e6142b4f67a442ee480986ca5b88edb01462dd2319843057683a5148bd/pyzmq-26.2.0-pp39-pypy39_pp73-win_amd64.whl", hash = "sha256:4f78c88905461a9203eac9faac157a2a0dbba84a0fd09fd29315db27be40af9f", size = 550757 },
 ]
+
+[[package]]
+name = "pyzorder"
+version = "0.0.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/1c/d0/f99375fb3d2c0614f6152b8fcd81f5ec29f84ecd8ba65fba70f7f005cf29/pyzorder-0.0.2.tar.gz", hash = "sha256:29ef907f5345b843f99629cf69483dd94bf039d2ba0fe3606867a913af7e8ccc", size = 6686 }
 
 [[package]]
 name = "referencing"

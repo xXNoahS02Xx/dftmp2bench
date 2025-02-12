@@ -50,10 +50,10 @@ xtb_exc = Path(directories["xtb"])
 
 # TODO: add option to switch between dft, and post HF methods
 
+#TODO: add option for different input file folders
 
 
-
-xyz_dir = current_dir / ".." / "data" / "xyzs"
+xyz_dir = current_dir / ".." / "data" / "xyzs2"
 xyzfilename = xyz_dir / "ala0.xyz"
 
 
