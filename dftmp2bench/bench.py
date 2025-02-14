@@ -98,7 +98,6 @@ def loop_softwares(
             inp = generate_input(
                 software, xyz, basis, method, xtb_exc, nproc=nproc, mem=mem, frz=frz
             )
-            print("loop_softwares")
             save_file(software, method, basis, output_dir, current_dir, xyz.name, inp, tag, nproc=nproc, mem=mem)
 
         if script_type == "output":
